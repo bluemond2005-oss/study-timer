@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="学習タイマー">
+  <title>学習タイマー</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ===== テーマ変数 ===== */
+    :root {
+      --bg:           #f2f2f7;
+      --bg-card:      #ffffff;
+      --bg-secondary: #e5e5ea;
+      --text:         #1c1c1e;
+      --text-sub:     #8e8e93;
+      --border:       #d1d1d6;
+      --accent:       #5e5ce6;
+      --accent-dark:  #4b49c8;
+      --danger:       #ff3b30;
+      --success:      #34c759;
+      --warning:      #ff9500;
+      --shadow:       rgba(0,0,0,0.07);
+      --line-green:   #06c755;
+    }
+    [data-theme="dark"] {
+      --bg:           #000000;
+      --bg-card:      #1c1c1e;
+      --bg-secondary: #2c2c2e;
+      --text:         #f2f2f7;
+      --text-sub:     #98989d;
+      --border:       #38383a;
+      --accent:       #7b79ff;
+      --accent-dark:  #9998ff;
+      --danger:       #ff453a;
+      --success:      #30d158;
+      --warning:      #ff9f0a;
+      --shadow:       rgba(0,0,0,0.35);
+      --line-green:   #06c755;
+    }
+
+    /* ===== リセット ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'YuGothic', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      max-width: 430px;
+      margin: 0 auto;
+      transition: background 0.3s, color 0.3s;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== ヘッダー ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .theme-btn {
+      background: var(--bg-secondary);
+      border: none;
+      border-radius: 50%;
+      width: 36px; height: 36px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ===== タブナビ ===== */
+    .tab-nav {
+      display: flex;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 57px;
+      z-index: 99;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 4px 8px;
+      background: none;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      color: var(--text-sub);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: color 0.2s, border-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-icon { font-size: 20px; }
+
+    /* ===== タブコンテンツ ===== */
+    .tab-content { display: none; padding: 16px 16px 40px; }
+    .tab-content.active { display: block; }
+
+    /* ===== カード ===== */
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 14px;
+    }
+
+    /* ===== 教科チップ ===== */
+    .subjects-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .subject-chip {
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 2px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text);
+      font-size: 14px; font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .subject-chip.selected {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ===== タイマー表示 ===== */
+    .timer-display { text-align: center; padding: 20px 0 12px; }
+    .timer-subject-name {
+      font-size: 15px;
+      color: var(--text-sub);
+      margin-bottom: 10px;
+      min-height: 22px;
+    }
+    .timer-time {
+      font-size: 76px;
+      font-weight: 700;
+      letter-spacing: -3px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      line-height: 1;
+      transition: color 0.3s;
+    }
+    .timer-time.running { color: var(--accent); }
+    .timer-progress-wrap { margin-top: 16px; }
+    .timer-progress {
+      height: 5px;
+      background: var(--bg-secondary);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .timer-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 1s linear;
+      width: 0%;
+    }
+    .timer-progress-bar.danger { background: var(--danger); }
+    .timer-limit-label {
+      font-size: 11px;
+      color: var(--text-sub);
+      text-align: right;
+      margin-top: 5px;
+    }
+
+    /* ===== ボタン ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      gap: 6px;
+      padding: 14px 22px;
+      border-radius: 14px;
+      border: none;
+      font-size: 16px; font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      font-family: inherit;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.35; pointer-events: none; }
+    .btn-full { width: 100%; }
+    .btn-large { padding: 17px 22px; font-size: 17px; border-radius: 16px; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-stop    { background: var(--danger); color: #fff; }
+    .btn-extend  { background: var(--warning); color: #fff; }
+    .btn-secondary { background: var(--bg-secondary); color: var(--text); }
+    .btn-line    { background: var(--line-green); color: #fff; }
+
+    .timer-controls { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .timer-main-row { display: flex; gap: 10px; }
+
+    /* ===== 今日のサマリー ===== */
+    .today-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .today-total { font-size: 34px; font-weight: 700; }
+    .today-total span { font-size: 15px; font-weight: 400; color: var(--text-sub); }
+    .session-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .session-item:last-child { border-bottom: none; }
+    .session-left { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ===== 月間統計 ===== */
+    .monthly-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .stat-value { font-size: 30px; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+
+    /* ===== 円グラフ ===== */
+    .chart-container {
+      position: relative;
+      height: 200px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #chartLegend { margin-top: 12px; line-height: 2; }
+
+    /* ===== 履歴リスト ===== */
+    .history-day { margin-bottom: 16px; }
+    .history-day-header {
+      font-size: 13px; font-weight: 600;
+      color: var(--text-sub);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+    .history-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 2px;
+      font-size: 14px;
+    }
+    .history-left { display: flex; align-items: center; gap: 8px; }
+    .history-time-tag {
+      font-size: 11px;
+      color: var(--text-sub);
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
+
+    /* ===== 設定 ===== */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 15px; font-weight: 500; }
+    .setting-sub { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+    input[type="text"], input[type="url"] {
+      width: 100%;
+      padding: 12px 14px;
+      margin-top: 8px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus,
+    input[type="url"]:focus { border-color: var(--accent); }
+
+    /* ===== 教科管理 ===== */
+    .subj-manage-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .subj-manage-item:last-child { border-bottom: none; }
+    .subj-manage-name { flex: 1; font-size: 15px; }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 8px;
+      font-size: 16px;
+      color: var(--text-sub);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .icon-btn.danger { color: var(--danger); }
+    .icon-btn:active { background: var(--bg-secondary); }
+    .add-subj-row { display: flex; gap: 8px; margin-top: 10px; }
+    .add-subj-row input { flex: 1; margin-top: 0; }
+    .add-subj-row .btn { padding: 12px 14px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+
+    /* ===== オーバーレイ ===== */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay.show { display: flex; }
+    .overlay-sheet {
+      background: var(--bg-card);
+      border-radius: 24px 24px 0 0;
+      padding: 28px 24px 50px;
+      width: 100%;
+      max-width: 430px;
+      text-align: center;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .overlay-icon  { font-size: 56px; margin-bottom: 12px; }
+    .overlay-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .overlay-msg   { font-size: 15px; color: var(--text-sub); margin-bottom: 24px; line-height: 1.6; }
+    .overlay-btns  { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ===== リマインダーバナー ===== */
+    .reminder-banner {
+      display: none;
+      background: linear-gradient(135deg, var(--accent) 0%, #a855f7 100%);
+      color: #fff;
+      padding: 14px 18px;
+      border-radius: 14px;
+      margin-bottom: 14px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .reminder-banner.show { display: block; }
+    .reminder-banner-title { font-size: 15px; font-weight: 700; }
+    .reminder-banner-sub   { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+
+    /* ===== トースト ===== */
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--text);
+      color: var(--bg);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px; font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 300;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ===== 空状態 ===== */
+    .empty { text-align: center; padding: 32px 16px; color: var(--text-sub); }
+    .empty-icon { font-size: 40px; margin-bottom: 10px; }
+    .empty-text { font-size: 14px; }
+
+    /* ===== フッター注釈 ===== */
+    .footer-note {
+      text-align: center;
+      padding: 8px 16px;
+      color: var(--text-sub);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header class="header">
+    <div class="header-title">📚 学習タイマー</div>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+  </header>
+
+  <!-- タブナビ -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" id="tab-timer" onclick="switchTab('timer')">
+      <span class="tab-icon">⏱</span>タイマー
+    </button>
+    <button class="tab-btn" id="tab-history" onclick="switchTab('history')">
+      <span class="tab-icon">📊</span>記録
+    </button>
+    <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">
+      <span class="tab-icon">⚙️</span>設定
+    </button>
+  </nav>
+
+  <!-- ========== タイマータブ ========== -->
+  <div class="tab-content active" id="content-timer">
+
+    <!-- リマインダーバナー -->
+    <div class="reminder-banner" id="reminderBanner" onclick="openLineReport()">
+      <div class="reminder-banner-title">📢 報告の時間です！</div>
+      <div class="reminder-banner-sub">タップしてLINEで今日の成果を報告しよう</div>
+    </div>
+
+    <!-- 今日のサマリー -->
+    <div class="card">
+      <div class="card-title">今日の学習</div>
+      <div class="today-row">
+        <div class="today-total" id="todayTotal">0<span> 分</span></div>
+        <button class="btn btn-line" style="padding:10px 16px;font-size:14px;border-radius:12px;" onclick="openLineReport()">
+          📤 LINE報告
+        </button>
+      </div>
+      <div id="todaySessionList"></div>
+    </div>
+
+    <!-- 教科選択 -->
+    <div class="card">
+      <div class="card-title">教科を選ぶ</div>
+      <div class="subjects-grid" id="subjectGrid"></div>
+    </div>
+
+    <!-- タイマー本体 -->
+    <div class="card">
+      <div class="timer-display">
+        <div class="timer-subject-name" id="timerSubjectName">教科を選んでスタート</div>
+        <div class="timer-time" id="timerDisplay">00:00</div>
+        <div class="timer-progress-wrap">
+          <div class="timer-progress">
+            <div class="timer-progress-bar" id="timerProgressBar"></div>
+          </div>
+          <div class="timer-limit-label" id="timerLimitLabel">90分で自動ストップ</div>
+        </div>
+      </div>
+      <div class="timer-controls">
+        <div class="timer-main-row">
+          <button class="btn btn-primary btn-large" style="flex:1" id="startStopBtn" onclick="toggleTimer()">
+            ▶ スタート
+          </button>
+        </div>
+        <button class="btn btn-extend btn-full" id="extendBtn" onclick="extendTimer()" style="display:none">
+          ⏰ 15分延長して続ける
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /タイマー -->
+
+  <!-- ========== 記録タブ ========== -->
+  <div class="tab-content" id="content-history">
+
+    <!-- 月間統計 -->
+    <div class="monthly-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="monthlyTotal">0</div>
+        <div class="stat-label">今月の合計（分）</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="monthlyDays">0</div>
+        <div class="stat-label">学習した日数</div>
+      </div>
+    </div>
+
+    <!-- 教科別グラフ -->
+    <div class="card">
+      <div class="card-title">教科別の割合（今月）</div>
+      <div class="chart-container">
+        <canvas id="pieChart"></canvas>
+      </div>
+      <div id="chartLegend"></div>
+    </div>
+
+    <!-- 履歴リスト -->
+    <div class="card">
+      <div class="card-title">学習記録</div>
+      <div id="historyList"></div>
+    </div>
+
+  </div><!-- /記録 -->
+
+  <!-- ========== 設定タブ ========== -->
+  <div class="tab-content" id="content-settings">
+
+    <!-- プロフィール -->
+    <div class="card">
+      <div class="card-title">プロフィール</div>
+      <label style="font-size:13px;color:var(--text-sub);">名前（LINE報告の冒頭に表示されます）</label>
+      <input type="text" id="nameInput" placeholder="例：お兄ちゃん" maxlength="20">
+      <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="saveName()">保存</button>
+    </div>
+
+    <!-- 教科管理 -->
+    <div class="card">
+      <div class="card-title">教科の管理</div>
+      <div id="subjectManageList"></div>
+      <div class="add-subj-row">
+        <input type="text" id="newSubjectInput" placeholder="新しい教科名" maxlength="20"
+               onkeydown="if(event.key==='Enter')addSubject()">
+        <button class="btn btn-primary" onclick="addSubject()">追加</button>
+      </div>
+    </div>
+
+    <!-- スプレッドシート連携 -->
+    <div class="card">
+      <div class="card-title">スプレッドシート自動記録（任意）</div>
+      <label style="font-size:13px;color:var(--text-sub);">Google Apps Script の URL（設定すると自動保存）</label>
+      <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/...">
+      <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="saveGasUrl()">保存</button>
+    </div>
+
+    <!-- データ管理 -->
+    <div class="card">
+      <div class="card-title">データ管理</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">CSVで書き出す</div>
+          <div class="setting-sub">全記録をCSVファイルとして保存</div>
+        </div>
+        <button class="btn btn-secondary" style="padding:10px 14px;font-size:14px;" onclick="exportCSV()">書き出す</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">データを全削除</div>
+          <div class="setting-sub">すべての学習記録を消去する</div>
+        </div>
+        <button class="btn btn-stop" style="padding:10px 14px;font-size:14px;" onclick="clearAllData()">削除</button>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      学習タイマー v1.0 ｜ データはこの端末のみに保存されます
+    </div>
+
+  </div><!-- /設定 -->
+
+  <!-- ========== オーバーレイ: 90分アラーム ========== -->
+  <div class="overlay" id="alarmOverlay">
+    <div class="overlay-sheet">
+      <div class="overlay-icon">⏰</div>
+      <div class="overlay-title">90分経ちました！</div>
+      <div class="overlay-msg">お疲れ様！少し休憩しましょう。<br>まだ続けますか？</div>
+      <div class="overlay-btns">
+        <button class="btn btn-extend btn-full btn-large" onclick="extendAndClose()">15分延長して続ける</button>
+        <button class="btn btn-primary btn-full btn-large" onclick="stopAndClose()">ストップして保存する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== オーバーレイ: 21時リマインダー ========== -->
+  <div class="overlay" id="reminderOverlay">
+    <div class="overlay-sheet">
+      <div class="overlay-icon">📢</div>
+      <div class="overlay-title">報告の時間です！</div>
+      <div class="overlay-msg">今日もよく頑張りました！<br>LINEで今日の成果を親に報告しよう。</div>
+      <div class="overlay-btns">
+        <button class="btn btn-line btn-full btn-large"
+                onclick="openLineReport(); closeOverlay('reminderOverlay')">LINEで報告する</button>
+        <button class="btn btn-secondary btn-full"
+                onclick="closeOverlay('reminderOverlay')">あとで</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ============================================================
+    // 定数・設定
+    // ============================================================
+    const KEYS = {
+      subjects: 'st_subjects',
+      records:  'st_records',
+      settings: 'st_settings',
+    };
+    const DEFAULT_SUBJECTS = ['国語', '数学', '英語', '理科', '社会'];
+    const COLORS = [
+      '#5e5ce6','#ff6b6b','#ffa94d','#51cf66',
+      '#339af0','#cc5de8','#f06595','#20c997',
+      '#fab005','#74c0fc'
+    ];
+    const MAX_MONTHS = 3;
+    const LIMIT_DEFAULT = 90 * 60; // 秒
+
+    // ============================================================
+    // データ読み書き
+    // ============================================================
+    function loadSubjects() {
+      const s = localStorage.getItem(KEYS.subjects);
+      return s ? JSON.parse(s) : [...DEFAULT_SUBJECTS];
+    }
+    function saveSubjects(arr) {
+      localStorage.setItem(KEYS.subjects, JSON.stringify(arr));
+    }
+    function loadRecords() {
+      const s = localStorage.getItem(KEYS.records);
+      return s ? JSON.parse(s) : [];
+    }
+    function saveRecords(arr) {
+      localStorage.setItem(KEYS.records, JSON.stringify(arr));
+    }
+    function loadSettings() {
+      const s = localStorage.getItem(KEYS.settings);
+      return s ? JSON.parse(s) : { name: '', gasUrl: '', theme: 'light' };
+    }
+    function saveSettings(obj) {
+      localStorage.setItem(KEYS.settings, JSON.stringify(obj));
+    }
+
+    // 3か月より古い記録を削除
+    function purgeOldRecords() {
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - MAX_MONTHS);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      const records = loadRecords().filter(r => r.date >= cutoffStr);
+      saveRecords(records);
+    }
+
+    // ============================================================
+    // タイマー状態
+    // ============================================================
+    let timerInterval  = null;
+    let timerSeconds   = 0;
+    let timerLimit     = LIMIT_DEFAULT;
+    let timerRunning   = false;
+    let alarmPending   = false; // アラーム後・未保存状態
+    let timerSubject   = null;
+    let timerStartTime = null;
+
+    // ============================================================
+    // タイマー操作
+    // ============================================================
+    function toggleTimer() {
+      if (timerRunning) {
+        stopTimer(true);
+      } else {
+        startTimer();
+      }
+    }
+
+    function startTimer() {
+      if (!timerSubject) {
+        showToast('先に教科を選んでください');
+        return;
+      }
+      timerRunning   = true;
+      alarmPending   = false;
+      timerStartTime = timerStartTime || new Date(); // 延長の場合は保持
+      document.getElementById('startStopBtn').innerHTML = '⏹ ストップ';
+      document.getElementById('startStopBtn').className = 'btn btn-stop btn-large';
+      document.getElementById('timerDisplay').classList.add('running');
+      document.getElementById('extendBtn').style.display = 'none';
+      timerInterval = setInterval(tickTimer, 1000);
+    }
+
+    function stopTimer(doSave) {
+      // 計測中 or アラーム後の未保存状態のどちらも受け付ける
+      if (!timerRunning && !alarmPending) return;
+
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      timerRunning = false;
+
+      const duration = Math.round(timerSeconds / 60);
+      if (doSave && duration >= 1) {
+        const rec = {
+          id:        Date.now(),
+          subject:   timerSubject,
+          date:      getToday(),
+          duration:  duration,
+          startTime: timerStartTime ? fmt2(timerStartTime) : '',
+          endTime:   fmt2(new Date()),
+        };
+        const records = loadRecords();
+        records.push(rec);
+        saveRecords(records);
+        sendToGAS(rec);
+        showToast(`${timerSubject} ${duration}分を保存しました`);
+        renderTodaySummary();
+      }
+
+      // リセット
+      timerSeconds   = 0;
+      timerLimit     = LIMIT_DEFAULT;
+      alarmPending   = false;
+      timerStartTime = null;
+      updateTimerDisplay();
+
+      document.getElementById('startStopBtn').innerHTML = '▶ スタート';
+      document.getElementById('startStopBtn').className = 'btn btn-primary btn-large';
+      document.getElementById('timerDisplay').classList.remove('running');
+      document.getElementById('extendBtn').style.display = 'none';
+      document.getElementById('timerSubjectName').textContent = timerSubject || '教科を選んでスタート';
+      document.getElementById('timerProgressBar').classList.remove('danger');
+      document.getElementById('timerLimitLabel').textContent = '90分で自動ストップ';
+    }
+
+    function tickTimer() {
+      timerSeconds++;
+      updateTimerDisplay();
+      if (timerSeconds >= timerLimit) {
+        triggerAlarm();
+      }
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(timerSeconds / 60);
+      const s = timerSeconds % 60;
+      document.getElementById('timerDisplay').textContent =
+        String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+
+      const pct = Math.min((timerSeconds / timerLimit) * 100, 100);
+      const bar = document.getElementById('timerProgressBar');
+      bar.style.width = pct + '%';
+      bar.classList.toggle('danger', pct >= 80);
+    }
+
+    function triggerAlarm() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      timerRunning  = false;
+      alarmPending  = true;
+
+      playAlarm();
+      document.getElementById('alarmOverlay').classList.add('show');
+      document.getElementById('startStopBtn').innerHTML = '▶ スタート';
+      document.getElementById('startStopBtn').className = 'btn btn-primary btn-large';
+      document.getElementById('timerDisplay').classList.remove('running');
+      document.getElementById('extendBtn').style.display = 'block';
+    }
+
+    function extendTimer() {
+      // 今の秒数に15分加算
+      timerLimit = timerSeconds + 15 * 60;
+      alarmPending = false;
+
+      const remaining = timerLimit - timerSeconds;
+      const remMin = Math.ceil(remaining / 60);
+      document.getElementById('timerLimitLabel').textContent = `あと ${remMin} 分で自動ストップ`;
+
+      if (!timerRunning) {
+        timerRunning = true;
+        timerInterval = setInterval(tickTimer, 1000);
+        document.getElementById('startStopBtn').innerHTML = '⏹ ストップ';
+        document.getElementById('startStopBtn').className = 'btn btn-stop btn-large';
+        document.getElementById('timerDisplay').classList.add('running');
+      }
+      document.getElementById('extendBtn').style.display = 'none';
+      document.getElementById('timerProgressBar').classList.remove('danger');
+      showToast('15分延長しました');
+    }
+
+    function extendAndClose() {
+      closeOverlay('alarmOverlay');
+      extendTimer();
+    }
+
+    function stopAndClose() {
+      closeOverlay('alarmOverlay');
+      stopTimer(true);
+    }
+
+    // ============================================================
+    // 教科選択
+    // ============================================================
+    function selectSubject(name) {
+      if (timerRunning) {
+        showToast('計測中は変えられません。先にストップしてください');
+        return;
+      }
+      timerSubject = name;
+      document.getElementById('timerSubjectName').textContent = name;
+      renderSubjectGrid();
+    }
+
+    function renderSubjectGrid() {
+      const subjects = loadSubjects();
+      document.getElementById('subjectGrid').innerHTML = subjects.map(s =>
+        `<button class="subject-chip ${s === timerSubject ? 'selected' : ''}"
+                 onclick="selectSubject('${escHtml(s)}')">${escHtml(s)}</button>`
+      ).join('');
+    }
+
+    // ============================================================
+    // 教科管理（設定タブ）
+    // ============================================================
+    function addSubject() {
+      const inp = document.getElementById('newSubjectInput');
+      const name = inp.value.trim();
+      if (!name) return;
+      const subjects = loadSubjects();
+      if (subjects.includes(name)) { showToast('すでに登録されています'); return; }
+      subjects.push(name);
+      saveSubjects(subjects);
+      inp.value = '';
+      renderSubjectManageList();
+      renderSubjectGrid();
+      showToast(`「${name}」を追加しました`);
+    }
+
+    function deleteSubject(name) {
+      if (!confirm(`「${name}」を削除しますか？`)) return;
+      let subjects = loadSubjects().filter(s => s !== name);
+      saveSubjects(subjects);
+      if (timerSubject === name) timerSubject = null;
+      renderSubjectManageList();
+      renderSubjectGrid();
+    }
+
+    function renderSubjectManageList() {
+      const subjects = loadSubjects();
+      const el = document.getElementById('subjectManageList');
+      if (subjects.length === 0) {
+        el.innerHTML = '<div style="color:var(--text-sub);font-size:14px;padding:8px 0">教科が登録されていません</div>';
+        return;
+      }
+      el.innerHTML = subjects.map((s, i) => `
+        <div class="subj-manage-item">
+          <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
+          <span class="subj-manage-name">${escHtml(s)}</span>
+          <button class="icon-btn danger" onclick="deleteSubject('${escHtml(s)}')">🗑</button>
+        </div>
+      `).join('');
+    }
+
+    // ============================================================
+    // 今日のサマリー
+    // ============================================================
+    function renderTodaySummary() {
+      const today = getToday();
+      const recs  = loadRecords().filter(r => r.date === today);
+      const total = recs.reduce((s, r) => s + r.duration, 0);
+
+      document.getElementById('todayTotal').innerHTML = `${total}<span> 分</span>`;
+
+      const el = document.getElementById('todaySessionList');
+      if (recs.length === 0) { el.innerHTML = ''; return; }
+
+      const subjects = loadSubjects();
+      const bySubject = {};
+      recs.forEach(r => { bySubject[r.subject] = (bySubject[r.subject] || 0) + r.duration; });
+
+      el.innerHTML = Object.entries(bySubject).map(([s, d]) => {
+        const idx   = subjects.indexOf(s);
+        const color = COLORS[idx >= 0 ? idx % COLORS.length : 0];
+        return `
+          <div class="session-item">
+            <div class="session-left">
+              <span class="dot" style="background:${color}"></span>
+              <span>${escHtml(s)}</span>
+            </div>
+            <span style="font-weight:600;">${d}分</span>
+          </div>`;
+      }).join('');
+    }
+
+    // ============================================================
+    // 履歴タブ
+    // ============================================================
+    function renderHistory() {
+      renderMonthlyStats();
+      renderPieChart();
+      renderHistoryList();
+    }
+
+    function renderMonthlyStats() {
+      const prefix  = getToday().slice(0, 7);
+      const recs    = loadRecords().filter(r => r.date.startsWith(prefix));
+      const total   = recs.reduce((s, r) => s + r.duration, 0);
+      const days    = new Set(recs.map(r => r.date)).size;
+      document.getElementById('monthlyTotal').textContent = total;
+      document.getElementById('monthlyDays').textContent  = days;
+    }
+
+    let pieChartInst = null;
+    function renderPieChart() {
+      const prefix   = getToday().slice(0, 7);
+      const recs     = loadRecords().filter(r => r.date.startsWith(prefix));
+      const subjects = loadSubjects();
+
+      const bySubject = {};
+      recs.forEach(r => { bySubject[r.subject] = (bySubject[r.subject] || 0) + r.duration; });
+
+      const labels = Object.keys(bySubject);
+      const data   = Object.values(bySubject);
+      const colors = labels.map(s => {
+        const idx = subjects.indexOf(s);
+        return COLORS[idx >= 0 ? idx % COLORS.length : COLORS.length - 1];
+      });
+
+      if (pieChartInst) { pieChartInst.destroy(); pieChartInst = null; }
+
+      if (labels.length === 0) {
+        document.getElementById('chartLegend').innerHTML =
+          '<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">今月の記録がありません</div></div>';
+        return;
+      }
+
+      const ctx = document.getElementById('pieChart').getContext('2d');
+      pieChartInst = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 8 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => ` ${c.label}：${c.parsed}分` } }
+          },
+          cutout: '52%'
+        }
+      });
+
+      document.getElementById('chartLegend').innerHTML = labels.map((l, i) =>
+        `<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 12px 3px 0;font-size:13px;">
+           <span style="width:10px;height:10px;border-radius:50%;background:${colors[i]};display:inline-block;flex-shrink:0;"></span>
+           ${escHtml(l)}：${data[i]}分
+         </span>`
+      ).join('');
+    }
+
+    function renderHistoryList() {
+      const records  = loadRecords().sort((a, b) => b.date.localeCompare(a.date));
+      const subjects = loadSubjects();
+      const el       = document.getElementById('historyList');
+
+      if (records.length === 0) {
+        el.innerHTML = '<div class="empty"><div class="empty-icon">📝</div><div class="empty-text">記録がありません</div></div>';
+        return;
+      }
+
+      const byDate = {};
+      records.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+
+      el.innerHTML = Object.entries(byDate).map(([date, recs]) => {
+        const total = recs.reduce((s, r) => s + r.duration, 0);
+        const rows  = recs.map(r => {
+          const idx   = subjects.indexOf(r.subject);
+          const color = COLORS[idx >= 0 ? idx % COLORS.length : 0];
+          const timeTag = r.startTime
+            ? `<span class="history-time-tag">${r.startTime}〜${r.endTime || ''}</span>` : '';
+          return `
+            <div class="history-row">
+              <div class="history-left">
+                <span class="dot" style="background:${color}"></span>
+                <span>${escHtml(r.subject)}</span>
+                ${timeTag}
+              </div>
+              <span style="font-weight:600;">${r.duration}分</span>
+            </div>`;
+        }).join('');
+        return `
+          <div class="history-day">
+            <div class="history-day-header">${formatDateJP(date)}（合計 ${total}分）</div>
+            ${rows}
+          </div>`;
+      }).join('');
+    }
+
+    // ============================================================
+    // LINE報告
+    // ============================================================
+    function openLineReport() {
+      const today    = getToday();
+      const recs     = loadRecords().filter(r => r.date === today);
+      const settings = loadSettings();
+      const name     = settings.name || '';
+
+      const total = recs.reduce((s, r) => s + r.duration, 0);
+      if (total === 0) { showToast('今日の記録がまだありません'); return; }
+
+      const bySubject = {};
+      recs.forEach(r => { bySubject[r.subject] = (bySubject[r.subject] || 0) + r.duration; });
+
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+      const totalStr = h > 0 ? `${h}時間${m > 0 ? m + '分' : ''}` : `${m}分`;
+
+      const breakdown = Object.entries(bySubject)
+        .map(([s, d]) => `・${s}：${d}分`)
+        .join('\n');
+
+      const nameLine = name ? `【${name}】の学習報告\n` : '';
+      const text = `${nameLine}📚 ${formatDateJP(today)}の学習記録\n\n合計：${totalStr}\n\n${breakdown}\n\n頑張りました！`;
+
+      window.open('https://line.me/R/share?text=' + encodeURIComponent(text), '_blank');
+    }
+
+    // ============================================================
+    // 設定
+    // ============================================================
+    function saveName() {
+      const settings = loadSettings();
+      settings.name  = document.getElementById('nameInput').value.trim();
+      saveSettings(settings);
+      showToast('名前を保存しました');
+    }
+
+    function saveGasUrl() {
+      const settings  = loadSettings();
+      settings.gasUrl = document.getElementById('gasUrlInput').value.trim();
+      saveSettings(settings);
+      showToast('GAS URLを保存しました');
+    }
+
+    function sendToGAS(rec) {
+      const { gasUrl } = loadSettings();
+      if (!gasUrl) return;
+      fetch(gasUrl, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(rec),
+      }).catch(() => {});
+    }
+
+    function exportCSV() {
+      const records = loadRecords();
+      if (records.length === 0) { showToast('記録がありません'); return; }
+
+      const header = '日付,教科,時間（分）,開始,終了';
+      const rows   = records.map(r =>
+        `${r.date},${r.subject},${r.duration},${r.startTime || ''},${r.endTime || ''}`
+      );
+      const csv  = [header, ...rows].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const a    = document.createElement('a');
+      a.href     = URL.createObjectURL(blob);
+      a.download = `学習記録_${getToday()}.csv`;
+      a.click();
+      showToast('CSVを書き出しました');
+    }
+
+    function clearAllData() {
+      if (!confirm('すべての学習記録を削除します。この操作は元に戻せません。\n本当によいですか？')) return;
+      localStorage.removeItem(KEYS.records);
+      renderTodaySummary();
+      renderHistory();
+      showToast('データを削除しました');
+    }
+
+    // ============================================================
+    // テーマ切り替え
+    // ============================================================
+    function toggleTheme() {
+      const html    = document.documentElement;
+      const current = html.getAttribute('data-theme') || 'light';
+      const next    = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
+      const settings = loadSettings();
+      settings.theme = next;
+      saveSettings(settings);
+      // グラフを再描画（ダーク/ライト切り替え後の色調整のため）
+      if (document.getElementById('content-history').classList.contains('active')) {
+        renderPieChart();
+      }
+    }
+
+    // ============================================================
+    // 21時リマインダー
+    // ============================================================
+    let reminderFiredToday = '';
+    function checkReminder() {
+      const now   = new Date();
+      const today = getToday();
+      if (now.getHours() === 21 && now.getMinutes() < 5 && reminderFiredToday !== today) {
+        reminderFiredToday = today;
+        document.getElementById('reminderOverlay').classList.add('show');
+        document.getElementById('reminderBanner').classList.add('show');
+      }
+    }
+    setInterval(checkReminder, 10000);
+
+    // ============================================================
+    // アラーム音（Web Audio API）
+    // ============================================================
+    function playAlarm() {
+      try {
+        const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+        const beep = (freq, startAt, dur) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = freq;
+          osc.type            = 'sine';
+          gain.gain.setValueAtTime(0.35, ctx.currentTime + startAt);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + dur);
+          osc.start(ctx.currentTime + startAt);
+          osc.stop(ctx.currentTime  + startAt + dur);
+        };
+        beep(880, 0.00, 0.25);
+        beep(660, 0.30, 0.25);
+        beep(880, 0.60, 0.45);
+      } catch (_) {}
+    }
+
+    // ============================================================
+    // タブ切り替え
+    // ============================================================
+    function switchTab(name) {
+      ['timer', 'history', 'settings'].forEach(t => {
+        document.getElementById('content-' + t).classList.toggle('active', t === name);
+        document.getElementById('tab-' + t).classList.toggle('active', t === name);
+      });
+      if (name === 'history')  renderHistory();
+      if (name === 'settings') {
+        renderSubjectManageList();
+        const s = loadSettings();
+        document.getElementById('nameInput').value   = s.name   || '';
+        document.getElementById('gasUrlInput').value = s.gasUrl || '';
+      }
+    }
+
+    // ============================================================
+    // ユーティリティ
+    // ============================================================
+    function getToday() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function fmt2(date) {
+      return String(date.getHours()).padStart(2, '0') + ':' +
+             String(date.getMinutes()).padStart(2, '0');
+    }
+
+    function formatDateJP(str) {
+      const [, m, d] = str.split('-');
+      const dow = ['日','月','火','水','木','金','土'][new Date(str).getDay()];
+      return `${parseInt(m)}月${parseInt(d)}日（${dow}）`;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    function closeOverlay(id) {
+      document.getElementById(id).classList.remove('show');
+    }
+
+    // ============================================================
+    // 初期化
+    // ============================================================
+    function init() {
+      purgeOldRecords();
+      const s = loadSettings();
+      if (s.theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.getElementById('themeBtn').textContent = '☀️';
+      }
+      renderSubjectGrid();
+      renderTodaySummary();
+    }
+
+    init();
+  </script>
+</body>
+</html>
