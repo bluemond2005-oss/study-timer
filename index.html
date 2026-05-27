@@ -1044,13 +1044,14 @@
     }
 
     function sendToGAS(rec) {
-      const { gasUrl } = loadSettings();
-      if (!gasUrl) return;
-      fetch(gasUrl, {
+      const settings = loadSettings();
+      if (!settings.gasUrl) return;
+      const payload = Object.assign({}, rec, { name: settings.name || '' });
+      fetch(settings.gasUrl, {
         method:  'POST',
         mode:    'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(rec),
+        body:    JSON.stringify(payload),
       }).catch(() => {});
     }
 
